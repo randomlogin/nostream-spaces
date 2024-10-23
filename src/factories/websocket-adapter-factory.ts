@@ -8,10 +8,13 @@ import { messageHandlerFactory } from './message-handler-factory'
 import { slidingWindowRateLimiterFactory } from './rate-limiter-factory'
 import { WebSocketAdapter } from '../adapters/web-socket-adapter'
 
+import { Fabric } from '@spacesprotocol/fabric'
+
 
 export const webSocketAdapterFactory = (
   eventRepository: IEventRepository,
   userRepository: IUserRepository,
+  fabric: Fabric,
 ) => ([client, request, webSocketServerAdapter]: [WebSocket, IncomingMessage, IWebSocketServerAdapter]) =>
     new WebSocketAdapter(
       client,
@@ -20,4 +23,5 @@ export const webSocketAdapterFactory = (
       messageHandlerFactory(eventRepository, userRepository),
       slidingWindowRateLimiterFactory,
       createSettings,
+      fabric,
     )

@@ -18,14 +18,17 @@ describe('messageHandlerFactory', () => {
   let factory
 
   beforeEach(() => {
-    eventRepository = {} as any
-    userRepository = {} as any
-    adapter = {} as any
-    event = {
-      tags: [],
-    } as any
-    factory = messageHandlerFactory(eventRepository, userRepository)
-  })
+  eventRepository = {} as any
+  userRepository = {} as any
+  adapter = {
+    getFabric: () => ({}), 
+  } as any
+  event = {
+    tags: [],
+  } as any
+  factory = messageHandlerFactory(eventRepository, userRepository)
+})
+
 
   it('returns EventMessageHandler when given an EVENT message', () => {
     message = [

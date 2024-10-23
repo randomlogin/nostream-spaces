@@ -17,7 +17,7 @@
     "inlineSources": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "lib": ["ESNext"]
+    "lib": ["ESNext", "DOM"]
   },
   "include": [
     "src/**/*.ts",

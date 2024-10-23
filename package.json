@@ -1,6 +1,6 @@
 {
   "name": "nostream",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "A Nostr relay written in Typescript.",
   "supportedNips": [
     1,
@@ -115,7 +115,9 @@
   },
   "dependencies": {
     "@noble/secp256k1": "1.7.1",
+    "@spacesprotocol/fabric": "file:../../fabric/dist",
     "axios": "^1.7.7",
+    "b4a": "^1.6.7",
     "bech32": "2.0.0",
     "body-parser": "1.20.1",
     "debug": "4.3.4",

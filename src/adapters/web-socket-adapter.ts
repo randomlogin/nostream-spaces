@@ -21,6 +21,7 @@ import { messageSchema } from '../schemas/message-schema'
 import { Settings } from '../@types/settings'
 import { SocketAddress } from 'net'
 
+import { Fabric } from '@spacesprotocol/fabric'
 
 const debug = createLogger('web-socket-adapter')
 const debugHeartbeat = debug.extend('heartbeat')
@@ -40,6 +41,7 @@ export class WebSocketAdapter extends EventEmitter implements IWebSocketAdapter 
     private readonly createMessageHandler: Factory<IMessageHandler, [IncomingMessage, IWebSocketAdapter]>,
     private readonly slidingWindowRateLimiter: Factory<IRateLimiter>,
     private readonly settings: Factory<Settings>,
+    private readonly fabric: Fabric,
   ) {
     super()
     this.alive = true
@@ -142,6 +144,10 @@ export class WebSocketAdapter extends EventEmitter implements IWebSocketAdapter 
 
   public getSubscriptions(): Map<string, SubscriptionFilter[]> {
     return new Map(this.subscriptions)
+  }
+
+  public getFabric(): Fabric {
+    return this.fabric
   }
 
   private async onClientMessage(raw: Buffer) {

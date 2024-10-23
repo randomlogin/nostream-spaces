@@ -16,10 +16,10 @@ module.exports = {
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     semi: ['error', 'never'],
     quotes: ['error', 'single', { avoidEscape: true }],
-    'sort-imports': ['error', {
-      ignoreCase: true,
-      allowSeparatedGroups: true,
-    }],
+    // 'sort-imports': ['error', {
+    //   ignoreCase: true,
+    //   allowSeparatedGroups: true,
+    // }],
     curly: [2, 'multi-line'],
     'max-len': [
       'error',

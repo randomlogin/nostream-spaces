@@ -1,11 +1,11 @@
-import { expect } from 'chai'
-import { IncomingMessage } from 'http'
-import Sinon from 'sinon'
-import WebSocket from 'ws'
-
 import { IEventRepository, IUserRepository } from '../../../src/@types/repositories'
+import { expect } from 'chai'
+import { Fabric } from '@spacesprotocol/fabric'
+import { IncomingMessage } from 'http'
 import { IWebSocketServerAdapter } from '../../../src/@types/adapters'
 import { SettingsStatic } from '../../../src/utils/settings'
+import Sinon from 'sinon'
+import WebSocket from 'ws'
 import { WebSocketAdapter } from '../../../src/adapters/web-socket-adapter'
 import { webSocketAdapterFactory } from '../../../src/factories/websocket-adapter-factory'
 
@@ -29,13 +29,16 @@ describe('webSocketAdapterFactory', () => {
         remoteIpHeader: 'remoteIpHeader',
       },
     })
+
     const eventRepository: IEventRepository = {} as any
     const userRepository: IUserRepository = {} as any
-
+    const fabric: Fabric = {} as any // Added fabric mock
+    
     const client: WebSocket = {
       on: onStub,
     } as any
     onStub.returns(client)
+    
     const request: IncomingMessage = {
       headers: {
         'sec-websocket-key': Buffer.from('key', 'utf8').toString('base64'),
@@ -44,10 +47,11 @@ describe('webSocketAdapterFactory', () => {
         remoteAddress: '::1',
       },
     } as any
+    
     const webSocketServerAdapter: IWebSocketServerAdapter = {} as any
 
     expect(
-      webSocketAdapterFactory(eventRepository, userRepository)([client, request, webSocketServerAdapter])
+      webSocketAdapterFactory(eventRepository, userRepository, fabric)([client, request, webSocketServerAdapter])
     ).to.be.an.instanceOf(WebSocketAdapter)
   })
 })

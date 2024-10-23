@@ -1,42 +1,57 @@
 import { expect } from 'chai'
-import Sinon from 'sinon'
-
-import * as databaseClientModule from '../../../src/database/client'
-
-import { AppWorker } from '../../../src/app/worker'
+import { Fabric } from '@spacesprotocol/fabric'
+import { IEventRepository, IUserRepository } from '../../../src/@types/repositories'
+import { IncomingMessage } from 'http'
+import { IWebSocketServerAdapter } from '../../../src/@types/adapters'
 import { SettingsStatic } from '../../../src/utils/settings'
-import { workerFactory } from '../../../src/factories/worker-factory'
+import { webSocketAdapterFactory } from '../../../src/factories/websocket-adapter-factory'
+import { WebSocketAdapter } from '../../../src/adapters/web-socket-adapter'
+import Sinon from 'sinon'
+import WebSocket from 'ws'
 
-
-describe('workerFactory', () => {
+describe('webSocketAdapterFactory', () => {
+  let onStub: Sinon.SinonStub
   let createSettingsStub: Sinon.SinonStub
-  let getMasterDbClientStub: Sinon.SinonStub
-  let getReadReplicaDbClientStub: Sinon.SinonStub
 
   beforeEach(() => {
+    onStub = Sinon.stub()
     createSettingsStub = Sinon.stub(SettingsStatic, 'createSettings')
-    getMasterDbClientStub = Sinon.stub(databaseClientModule, 'getMasterDbClient')
-    getReadReplicaDbClientStub = Sinon.stub(databaseClientModule, 'getReadReplicaDbClient')
   })
 
   afterEach(() => {
-    getReadReplicaDbClientStub.restore()
-    getMasterDbClientStub.restore()
     createSettingsStub.restore()
+    onStub.reset()
   })
 
-  it('returns an AppWorker', () => {
+  it('returns a WebSocketAdapter', () => {
     createSettingsStub.returns({
-      info: {
-        relay_url: 'url',
-      },
       network: {
-
+        remoteIpHeader: 'remoteIpHeader',
       },
     })
 
-    const worker = workerFactory()
-    expect(worker).to.be.an.instanceOf(AppWorker)
-    worker.close()
+    const eventRepository: IEventRepository = {} as any
+    const userRepository: IUserRepository = {} as any
+    const fabric: Fabric = {} as any // Added fabric mock
+    
+    const client: WebSocket = {
+      on: onStub,
+    } as any
+    onStub.returns(client)
+    
+    const request: IncomingMessage = {
+      headers: {
+        'sec-websocket-key': Buffer.from('key', 'utf8').toString('base64'),
+      },
+      socket: {
+        remoteAddress: '::1',
+      },
+    } as any
+    
+    const webSocketServerAdapter: IWebSocketServerAdapter = {} as any
+
+    expect(
+      webSocketAdapterFactory(eventRepository, userRepository, fabric)([client, request, webSocketServerAdapter])
+    ).to.be.an.instanceOf(WebSocketAdapter)
   })
 })
