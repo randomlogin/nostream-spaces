@@ -5,7 +5,7 @@ import { pipeline } from 'stream/promises'
 
 import { createEndOfStoredEventsNoticeMessage, createNoticeMessage, createOutgoingEventMessage } from '../utils/messages'
 import { IAbortable, IMessageHandler } from '../@types/message-handlers'
-import { isEventMatchingFilter, toNostrEvent } from '../utils/event'
+import { isEventMatchingFilter, toNostrEvent, getEventHash} from '../utils/event'
 import { streamEach,  streamFilter, streamMap } from '../utils/stream'
 import { SubscriptionFilter, SubscriptionId } from '../@types/subscription'
 import { createLogger } from '../factories/logger-factory'
@@ -102,35 +102,28 @@ export class SubscribeMessageHandler implements IMessageHandler, IAbortable {
     }
   }
 
-  private async queryFabricByFilters(
+
+    private async queryFabricByFilters(
     filters: SubscriptionFilter[],
     sendEvent: (event: Event) => void,
     isSubscribedToEvent: (event: Event) => boolean
   ): Promise<void> {
     for (const filter of filters) {
-      // Extract spaces from #s tag
-      const spaceTags = filter['#s'] 
+      if (!this.shouldQueryFabricForFilter(filter)) {
+        debug('Skipping Fabric query for filter: no addressable/replaceable events or space tags/authors')
+        continue
+      }
+
+      const spaceTags = filter['#s']
       const spaces = spaceTags ? (Array.isArray(spaceTags) ? spaceTags : [spaceTags]) : []
 
-      console.log(spaces)
-      
-      // Extract d tags from #d tag
       const dTagValues = filter['#d']
       const dTags = dTagValues ? (Array.isArray(dTagValues) ? dTagValues : [dTagValues]) : ['']
 
-      console.log(dTags)
-      
-      // Get authors/pubkeys
       const authors = filter.authors || []
+      const kinds = filter.kinds || []
 
-      console.log(authors)
-      
-      // Get kinds to query - use all kinds from filter, or common Fabric kinds if none specified
-      const kinds = filter.kinds //
-
-      console.log(kinds)
-
-      // Query by spaces first (if any)
+      // Query by spaces if available
       for (const space of spaces) {
         for (const kind of kinds) {
           for (const dTag of dTags) {
@@ -142,8 +135,8 @@ export class SubscribeMessageHandler implements IMessageHandler, IAbortable {
           }
         }
       }
-      
-      // Query by authors/pubkeys (if any)
+
+      // Query by authors/pubkeys if available
       for (const author of authors) {
         for (const kind of kinds) {
           for (const dTag of dTags) {
@@ -155,20 +148,11 @@ export class SubscribeMessageHandler implements IMessageHandler, IAbortable {
           }
         }
       }
-      
-      // If no spaces or authors specified, skip Fabric query
-      if (spaces.length === 0 && authors.length === 0) {
-        debug('Fabric query skipped: no spaces or authors specified in filter')
-      }
     }
   }
 
-  private extractDTagsFromFilter(filter: SubscriptionFilter): string[] {
-    if (!filter['#d']) return []
-    return Array.isArray(filter['#d']) ? filter['#d'] : [filter['#d']]
-  }
 
-  private async queryFabricEvent(
+   private async queryFabricEvent(
     spaceOrPubkey: string,
     kind: number,
     d: string,
@@ -178,27 +162,23 @@ export class SubscribeMessageHandler implements IMessageHandler, IAbortable {
   ): Promise<void> {
     try {
       const opts: any = {}
-      
-      // Add created_at filter if specified
+
       if (filter.since) {
         opts.created_at = filter.since
       }
 
       const fabricResult = await this.fabric.eventGet(spaceOrPubkey, kind, d, opts)
 
-      console.log('fabr result', fabricResult)
+      debug('received from fabric:', fabricResult)
 
       if (fabricResult && fabricResult.event) {
-        const convertedEvent = this.convertFabricEventToNostrEvent(fabricResult)
-        
-        // Additional filtering based on until timestamp
+        const convertedEvent = await this.convertFabricEvent(fabricResult)
+
         if (filter.until && convertedEvent.created_at > filter.until) {
           return
         }
-        
-        // Check if the event matches the subscription filters
+
         if (isSubscribedToEvent(convertedEvent)) {
-          debug('sending Fabric event: %s', convertedEvent.id)
           sendEvent(convertedEvent)
         }
       }
@@ -207,64 +187,65 @@ export class SubscribeMessageHandler implements IMessageHandler, IAbortable {
     }
   }
 
-  private convertFabricEventToNostrEvent(fabricResult: any): Event {
+    private shouldQueryFabricForFilter(filter: SubscriptionFilter): boolean {
+    const kinds = filter.kinds || []
+
+    const hasAddressableOrReplaceable = kinds.some(kind =>
+      (kind >= 30000 && kind <= 39999) || // Addressable events
+      (kind >= 10000 && kind <= 19999)    // Replaceable events
+    )
+
+    if (!hasAddressableOrReplaceable) {
+      return false
+    }
+
+    const hasSpaceTags = filter['#s'] && ( Array.isArray(filter['#s']) ? filter['#s'].length > 0 : true)
+    const hasAuthors = filter.authors && filter.authors.length > 0
+
+    return hasSpaceTags || hasAuthors
+  }
+
+  private async convertFabricEvent(fabricResult: any): Promise<Event> {
     const fabricEvent = fabricResult.event
-
     debug('fabric event', fabricEvent)
-    
-    // Convert binary data to hex strings
-    const pubkey = fabricEvent.pubkey instanceof Buffer || fabricEvent.pubkey instanceof Uint8Array 
-      ? b4a.toString(fabricEvent.pubkey, 'hex')
-      : fabricEvent.pubkey
 
-    const sig = fabricEvent.sig instanceof Buffer || fabricEvent.sig instanceof Uint8Array
-      ? b4a.toString(fabricEvent.sig, 'hex') 
-      : fabricEvent.sig
+    const pubkey = fabricEvent.pubkey instanceof Buffer || fabricEvent.pubkey instanceof Uint8Array ? b4a.toString(fabricEvent.pubkey, 'hex') : fabricEvent.pubkey
+    const sig = fabricEvent.sig instanceof Buffer || fabricEvent.sig instanceof Uint8Array ? b4a.toString(fabricEvent.sig, 'hex') : fabricEvent.sig
+    const proof = fabricEvent.proof instanceof Buffer || fabricEvent.proof instanceof Uint8Array ? b4a.toString(fabricEvent.proof, 'hex') : fabricEvent.proof
 
-    // Convert content from Uint8Array to string
     let content = ''
     if (fabricEvent.content instanceof Uint8Array || fabricEvent.content instanceof Buffer) {
-      content = fabricEvent.binary_content 
+      content = fabricEvent.binary_content
         ? b4a.toString(fabricEvent.content, 'base64')
         : b4a.toString(fabricEvent.content, 'utf-8')
     } else {
       content = fabricEvent.content || ''
     }
 
-    // Ensure all tag values are strings
-    const normalizedTags = (fabricEvent.tags || []).map((tag: any[]) => 
-      tag.map((value: any) => {
-        if (value === null || value === undefined) return ''
-        if (value instanceof Buffer || value instanceof Uint8Array) {
-          return b4a.toString(value, 'hex')
-        }
-        return String(value)
-      })
-    )
-
-    // Generate event ID if not present
-    let eventId = fabricEvent.id
-    if (!eventId) {
-      // You might want to generate the ID based on the event content
-      // For now, using a placeholder - you should implement proper ID generation
-      eventId = 'generated-id-placeholder'
-    } else if (eventId instanceof Buffer || eventId instanceof Uint8Array) {
-      eventId = b4a.toString(eventId, 'hex')
-    }
-    
-    // Convert CompactEvent format to Nostr Event format
-    return {
-      id: eventId,
+    const baseEvent = {
+      id: undefined,
       pubkey: pubkey,
       created_at: fabricEvent.created_at,
       kind: fabricEvent.kind,
-      tags: normalizedTags,
+      tags: fabricEvent.tags, //tags are sent as [][]string
       content: content,
       sig: sig,
-      // Add any additional metadata from Fabric result if needed
-      // Note: You might want to include closestNodes info somehow
+      proof: proof,
+    }
+
+    let eventId = fabricEvent.id
+    if (!eventId) {
+      eventId = await getEventHash(baseEvent)
+    } else if (eventId instanceof Buffer || eventId instanceof Uint8Array) {
+      eventId = b4a.toString(eventId, 'hex')
+    }
+
+    return {
+      ...baseEvent,
+      id: eventId,
     } as Event
   }
+
 
   private static isClientSubscribedToEvent(filters: SubscriptionFilter[]): (event: Event) => boolean {
     return anyPass(map(isEventMatchingFilter)(filters))
@@ -276,28 +257,28 @@ export class SubscribeMessageHandler implements IMessageHandler, IAbortable {
     const subscriptionLimits = this.settings().limits?.client?.subscription
 
     if (existingSubscription?.length && equals(filters, existingSubscription)) {
-        return `Duplicate subscription ${subscriptionId}: Ignoring`
+      return `Duplicate subscription ${subscriptionId}: Ignoring`
     }
 
     const maxSubscriptions = subscriptionLimits?.maxSubscriptions ?? 0
     if (maxSubscriptions > 0
-      && !existingSubscription?.length && subscriptions.size + 1 > maxSubscriptions
-    ) {
-      return `Too many subscriptions: Number of subscriptions must be less than or equal to ${maxSubscriptions}`
-    }
+        && !existingSubscription?.length && subscriptions.size + 1 > maxSubscriptions
+       ) {
+         return `Too many subscriptions: Number of subscriptions must be less than or equal to ${maxSubscriptions}`
+       }
 
-    const maxFilters = subscriptionLimits?.maxFilters ?? 0
-    if (maxFilters > 0) {
-      if (filters.length > maxFilters) {
-        return `Too many filters: Number of filters per subscription must be less then or equal to ${maxFilters}`
-      }
-    }
+       const maxFilters = subscriptionLimits?.maxFilters ?? 0
+       if (maxFilters > 0) {
+         if (filters.length > maxFilters) {
+           return `Too many filters: Number of filters per subscription must be less then or equal to ${maxFilters}`
+         }
+       }
 
-    if (
-      typeof subscriptionLimits.maxSubscriptionIdLength === 'number'
-      && subscriptionId.length > subscriptionLimits.maxSubscriptionIdLength
-    ) {
-      return `Subscription ID too long: Subscription ID must be less or equal to ${subscriptionLimits.maxSubscriptionIdLength}`
-    }
+       if (
+         typeof subscriptionLimits.maxSubscriptionIdLength === 'number'
+       && subscriptionId.length > subscriptionLimits.maxSubscriptionIdLength
+       ) {
+         return `Subscription ID too long: Subscription ID must be less or equal to ${subscriptionLimits.maxSubscriptionIdLength}`
+       }
   }
 }

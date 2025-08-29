@@ -3,7 +3,7 @@ import http from 'http'
 import process from 'process'
 import { WebSocketServer } from 'ws'
 
-import { AnchorStore } from '@spacesprotocol/fabric/'
+import { AnchorStore } from '@spacesprotocol/fabric/anchor'
 import { Fabric } from '@spacesprotocol/fabric'
 
 import { getMasterDbClient, getReadReplicaDbClient } from '../database/client'
