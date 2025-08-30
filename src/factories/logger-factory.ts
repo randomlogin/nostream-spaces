@@ -2,7 +2,7 @@ import cluster from 'cluster'
 import debug from 'debug'
 
 export const createLogger = (
-  namespace: string,
+  namespace = 'unnamed-logger',
   options: { enabled?: boolean; stdout?: boolean } = { enabled: false, stdout: false }
 ) => {
   const prefix = cluster.isWorker ? process.env.WORKER_TYPE : 'primary'

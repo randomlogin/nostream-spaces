@@ -24,7 +24,7 @@ export const messageHandlerFactory = (
         )
       }
     case MessageType.REQ:
-      return new SubscribeMessageHandler(adapter, eventRepository, createSettings)
+      return new SubscribeMessageHandler(adapter, eventRepository, createSettings, (adapter as any).getFabric())
     case MessageType.CLOSE:
       return new UnsubscribeMessageHandler(adapter)
     default:

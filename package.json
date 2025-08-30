@@ -24,10 +24,10 @@
   "scripts": {
     "dev": "node -r ts-node/register src/index.ts",
     "clean": "rimraf ./{dist,.nyc_output,.test-reports,.coverage}",
-    "build": "tsc --project tsconfig.build.json",
+    "build": "tsc --project tsconfig.build.json && cp -r resources dist/ && cp -r .nostr dist/",
     "prestart": "npm run build",
     "start": "cd dist && node src/index.js",
-    "build:check": "npm run build -- --noEmit",
+    "build:check": "tsc --project tsconfig.build.json --noEmit",
     "lint": "eslint --ext .ts ./src ./test",
     "lint:report": "eslint -o .lint-reports/eslint.json -f json --ext .ts ./src ./test",
     "lint:fix": "npm run lint -- --fix",
@@ -115,7 +115,9 @@
   },
   "dependencies": {
     "@noble/secp256k1": "1.7.1",
+    "@spacesprotocol/fabric": "file:../../fabric/dist",
     "axios": "^1.7.7",
+    "b4a": "^1.6.7",
     "bech32": "2.0.0",
     "body-parser": "1.20.1",
     "debug": "4.3.4",

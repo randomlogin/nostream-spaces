@@ -162,8 +162,8 @@ export const encryptKind4Event = (
   receiverPubkey: Pubkey,
 ) => (event: UnsignedEvent): UnsignedEvent => {
   const key = secp256k1
-    .getSharedSecret(senderPrivkey, `02${receiverPubkey}`, true)
-    .subarray(1)
+  .getSharedSecret(senderPrivkey, `02${receiverPubkey}`, true)
+  .subarray(1)
 
   const iv = getRandomValues(new Uint8Array(16))
 

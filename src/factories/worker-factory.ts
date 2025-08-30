@@ -3,6 +3,9 @@ import http from 'http'
 import process from 'process'
 import { WebSocketServer } from 'ws'
 
+import { AnchorStore } from '@spacesprotocol/fabric/anchor'
+import { Fabric } from '@spacesprotocol/fabric'
+
 import { getMasterDbClient, getReadReplicaDbClient } from '../database/client'
 import { AppWorker } from '../app/worker'
 import { createSettings } from '../factories/settings-factory'
@@ -12,7 +15,7 @@ import { UserRepository } from '../repositories/user-repository'
 import { webSocketAdapterFactory } from './websocket-adapter-factory'
 import { WebSocketServerAdapter } from '../adapters/web-socket-server-adapter'
 
-export const workerFactory = (): AppWorker => {
+export const workerFactory = async (): Promise<AppWorker> => {
   const dbClient = getMasterDbClient()
   const readReplicaDbClient = getReadReplicaDbClient()
   const eventRepository = new EventRepository(dbClient, readReplicaDbClient)
@@ -21,6 +24,10 @@ export const workerFactory = (): AppWorker => {
   const settings = createSettings()
 
   const app = createWebApp()
+
+
+  const remote_anchors = (process.env.FABRIC_REMOTE_ANCHORS ? process.env.FABRIC_REMOTE_ANCHORS.split(',') : undefined)
+  const fabric = new Fabric({ anchor: await AnchorStore.create({ remoteUrls: remote_anchors})})
 
   // deepcode ignore HttpToHttps: we use proxies
   const server = http.createServer(app)
@@ -58,7 +65,7 @@ export const workerFactory = (): AppWorker => {
   const adapter = new WebSocketServerAdapter(
     server,
     webSocketServer,
-    webSocketAdapterFactory(eventRepository, userRepository),
+    webSocketAdapterFactory(eventRepository, userRepository, fabric),
     createSettings,
   )
 

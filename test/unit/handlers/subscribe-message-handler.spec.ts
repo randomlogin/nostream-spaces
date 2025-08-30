@@ -2,6 +2,7 @@ import { always } from 'ramda'
 import chai from 'chai'
 import chaiAsPromised from 'chai-as-promised'
 import EventEmitter from 'events'
+import { Fabric } from '@spacesprotocol/fabric'
 import Sinon from 'sinon'
 
 import { IAbortable, IMessageHandler } from '../../../src/@types/message-handlers'
@@ -29,15 +30,18 @@ const toDbEvent = (event: Event) => ({
 
 describe('SubscribeMessageHandler', () => {
   const subscriptionId: SubscriptionId = 'subscriptionId'
+  const fabric = {}  as Fabric
   let filters: SubscriptionFilter[]
   let subscriptions: Map<SubscriptionId, SubscriptionFilter[]>
   let handler: IMessageHandler & IAbortable
   let webSocket: IWebSocketAdapter
+
   let eventRepository: IEventRepository
   let message: SubscribeMessage
   let stream: PassThrough
   let settingsFactory: Sinon.SinonStub
   let webSocketGetSubscriptionsStub: Sinon.SinonStub
+
   let eventRepositoryFindByFiltersStub: Sinon.SinonSpy
 
   let sandbox: Sinon.SinonSandbox
@@ -63,6 +67,7 @@ describe('SubscribeMessageHandler', () => {
       webSocket,
       eventRepository,
       settingsFactory,
+      fabric
     )
   })
 
@@ -302,7 +307,7 @@ describe('SubscribeMessageHandler', () => {
         {}, {},
       ]
 
-      expect((handler as any).canSubscribe(subscriptionId, filters)).to.equal('Too many filters: Number of filters per susbscription must be less then or equal to 1')
+      expect((handler as any).canSubscribe(subscriptionId, filters)).to.equal('Too many filters: Number of filters per subscription must be less then or equal to 1')
     })
   })
 })
