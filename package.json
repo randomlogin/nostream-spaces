@@ -27,7 +27,7 @@
     "build": "tsc --project tsconfig.build.json && cp -r resources dist/ && cp -r .nostr dist/",
     "prestart": "npm run build",
     "start": "cd dist && node src/index.js",
-    "build:check": "npm run build -- --noEmit",
+    "build:check": "tsc --project tsconfig.build.json --noEmit",
     "lint": "eslint --ext .ts ./src ./test",
     "lint:report": "eslint -o .lint-reports/eslint.json -f json --ext .ts ./src ./test",
     "lint:fix": "npm run lint -- --fix",
